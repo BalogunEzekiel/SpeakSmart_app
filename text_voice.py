@@ -1,6 +1,4 @@
 import streamlit as st
-import sounddevice as sd
-from scipy.io.wavfile import write
 import speech_recognition as sr
 from deep_translator import GoogleTranslator
 from gtts import gTTS
@@ -9,7 +7,7 @@ import tempfile
 import os
 import uuid
 
-# Supported language codes for translation and voice
+# Supported languages
 languages = {
     "Telugu": "te",
     "Tamil": "ta",
@@ -21,26 +19,21 @@ languages = {
     "Russian": "ru"
 }
 
-# Get supported gTTS language codes
 tts_supported = tts_langs().keys()
 
-# Page setup
+# Streamlit UI
 st.set_page_config(page_title="🎙️ Voice ↔ Text Translator", layout="centered")
 st.title("🎙️ Voice ↔ Text Translator App")
 
-# Mode selection
-mode = st.radio("Choose Mode", ["📝 Text → Voice", "🎤 Voice → Text"])
+mode = st.radio("Choose Mode", ["📝 Text → Voice", "🎤 Voice (Audio File) → Text"])
 
-# Language selection
 selected_languages = st.multiselect(
     "🌍 Select languages to translate to",
     list(languages.keys()),
     default=["Telugu", "Tamil", "Hindi"]
 )
 
-# =============================
-# 📝 TEXT → VOICE
-# =============================
+# TEXT TO VOICE
 if mode == "📝 Text → Voice":
     input_text = st.text_area("✏️ Enter English Text")
 
@@ -50,7 +43,6 @@ if mode == "📝 Text → Voice":
         else:
             for lang in selected_languages:
                 code = languages[lang]
-
                 try:
                     translated = GoogleTranslator(source='en', target=code).translate(input_text)
 
@@ -59,12 +51,9 @@ if mode == "📝 Text → Voice":
                         filename = f"{uuid.uuid4().hex}.mp3"
                         tts.save(filename)
 
-                        # Language name as heading
                         st.markdown(f"### {lang}")
-
                         with open(filename, "rb") as audio_file:
                             st.audio(audio_file.read(), format="audio/mp3")
-
                         os.remove(filename)
                     else:
                         st.warning(f"⚠ Audio not supported for {lang} ({code})")
@@ -72,22 +61,15 @@ if mode == "📝 Text → Voice":
                 except Exception as e:
                     st.error(f"❌ Error for {lang}: {e}")
 
-# =============================
-# 🎤 VOICE → TEXT
-# =============================
+# VOICE TO TEXT (with File Upload)
 else:
-    duration = st.slider("🎧 Recording Duration (in seconds)", 3, 10, 5)
+    st.info("🎧 Upload a WAV audio file (your voice)")
+    uploaded_file = st.file_uploader("Upload .wav file", type=["wav"])
 
-    if st.button("🎤 Record & Translate"):
-        st.info("Recording... Speak now!")
-
+    if uploaded_file is not None:
         try:
-            fs = 44100
-            recording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
-            sd.wait()
-
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio_file:
-                write(temp_audio_file.name, fs, recording)
+                temp_audio_file.write(uploaded_file.read())
                 wav_path = temp_audio_file.name
 
             recognizer = sr.Recognizer()
